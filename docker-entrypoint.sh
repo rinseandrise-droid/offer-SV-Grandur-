@@ -11,7 +11,8 @@ mkdir -p "$DATA" "$WA_AUTH" "$WA_CACHE"
 touch "$DATA/.persistent_volume" 2>/dev/null || true
 rm -f "$WA_AUTH/.bridge.lock" 2>/dev/null || true
 
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
+export WHATSAPP_CLIENT_ID="${WHATSAPP_CLIENT_ID:-sv-grandur}"
 export WHATSAPP_AUTH_DIR="$WA_AUTH"
 export WHATSAPP_CACHE_DIR="$WA_CACHE"
 export WHATSAPP_BRIDGE_PORT="$BRIDGE_PORT"
@@ -56,6 +57,23 @@ start_bridge_background() {
 }
 
 start_bridge_background
+
+if [ "${WHATSAPP_ENABLED:-1}" != "0" ]; then
+  echo "Waiting for WhatsApp bridge to start..."
+  waited=0
+  while [ "$waited" -lt 45 ]; do
+    if bridge_healthy; then
+      echo "WhatsApp bridge is up (session restores automatically if already linked)."
+      break
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+fi
+
+if [ ! -f "$DATA/.persistent_volume" ]; then
+  echo "WARNING: Railway Volume may not be mounted at /app/data — WhatsApp will need QR scan after every deploy."
+fi
 
 echo "Starting Gunicorn on port ${PORT}..."
 echo "Persistent data: $DATA (mount a Railway Volume at /app/data)"

@@ -36,7 +36,7 @@ def bridge_is_running() -> bool:
 
 
 def _bridge_status_timeout() -> int:
-    return 4
+    return 10 if is_cloud_deployment() else 4
 
 
 def _bridge_request(

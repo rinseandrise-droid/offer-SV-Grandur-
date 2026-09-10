@@ -147,30 +147,90 @@ function renderHistory(rows) {
 }
 
 let waPollTimer = null;
+let waBackgroundTimer = null;
+let lastRenderedWhatsAppQr = null;
+
+function isWhatsAppSessionRestoring(status) {
+  if (!status) return false;
+  if (status.sessionRestoring) return true;
+  if (!status.sessionLinked || status.ready) return false;
+  return ["starting", "restoring", "loading", "authenticating", "connecting", "reconnecting"].includes(
+    status.phase
+  );
+}
+
+function updateWhatsAppPill(status) {
+  const connectBtn = $("#waConnectBtn");
+  if (!status) {
+    waStatusPill.textContent = "WhatsApp offline";
+    waStatusPill.className = "status-pill offline";
+    if (connectBtn) connectBtn.textContent = "Connect WhatsApp";
+    return;
+  }
+  if (status.ready) {
+    waStatusPill.textContent = "WhatsApp Ready";
+    waStatusPill.className = "status-pill ready";
+    if (connectBtn) {
+      connectBtn.textContent = "WhatsApp connected";
+      connectBtn.disabled = false;
+    }
+    return;
+  }
+  if (isWhatsAppSessionRestoring(status)) {
+    waStatusPill.textContent = "Restoring session…";
+    waStatusPill.className = "status-pill";
+    if (connectBtn) connectBtn.textContent = "Restoring WhatsApp…";
+    return;
+  }
+  if (status.qr || status.phase === "qr") {
+    waStatusPill.textContent = "Scan QR to link";
+    waStatusPill.className = "status-pill offline";
+    if (connectBtn) connectBtn.textContent = "Scan WhatsApp QR";
+    return;
+  }
+  if (status.available) {
+    waStatusPill.textContent = "WhatsApp starting…";
+    waStatusPill.className = "status-pill";
+    if (connectBtn) connectBtn.textContent = "Connect WhatsApp";
+    return;
+  }
+  waStatusPill.textContent = "WhatsApp offline";
+  waStatusPill.className = "status-pill offline";
+  if (connectBtn) connectBtn.textContent = "Connect WhatsApp";
+}
 
 async function refreshWhatsAppStatus(startBridge = false) {
   try {
     const q = startBridge ? "?start=1" : "";
     const status = await api(`/api/whatsapp/status${q}`);
-    if (status.ready) {
-      waStatusPill.textContent = "WhatsApp Ready";
-      waStatusPill.className = "status-pill ready";
-    } else if (status.sessionRestoring) {
-      waStatusPill.textContent = "WhatsApp restoring…";
-      waStatusPill.className = "status-pill";
-    } else if (status.available) {
-      waStatusPill.textContent = "WhatsApp connecting…";
-      waStatusPill.className = "status-pill";
-    } else {
-      waStatusPill.textContent = "WhatsApp offline";
-      waStatusPill.className = "status-pill offline";
-    }
+    updateWhatsAppPill(status);
+    scheduleWhatsAppBackgroundPoll(status);
     return status;
   } catch {
-    waStatusPill.textContent = "WhatsApp status unknown";
-    waStatusPill.className = "status-pill offline";
+    updateWhatsAppPill(null);
     return null;
   }
+}
+
+function scheduleWhatsAppBackgroundPoll(status) {
+  if (waBackgroundTimer) {
+    clearInterval(waBackgroundTimer);
+    waBackgroundTimer = null;
+  }
+  if (status?.ready) return;
+  const intervalMs = isWhatsAppSessionRestoring(status) || status?.available ? 3000 : 8000;
+  waBackgroundTimer = setInterval(() => {
+    if (!appView.classList.contains("hidden") && !$("#waModal")?.classList.contains("hidden")) return;
+    refreshWhatsAppStatus().catch(() => {});
+  }, intervalMs);
+}
+
+function bindWhatsAppResetButton() {
+  $("#waResetBtn")?.addEventListener("click", async () => {
+    lastRenderedWhatsAppQr = null;
+    await api("/api/whatsapp/reset", { method: "POST" });
+    pollWhatsAppModal(true);
+  });
 }
 
 function renderWhatsAppModal(status) {
@@ -181,22 +241,52 @@ function renderWhatsAppModal(status) {
     return;
   }
   if (status.ready) {
-    body.innerHTML = "<p><strong>WhatsApp is connected!</strong></p><p>You can send coupon messages to customers.</p>";
+    lastRenderedWhatsAppQr = null;
+    body.innerHTML =
+      "<p><strong>WhatsApp is connected!</strong></p><p>Session is saved on the server — you will not need to scan again after restarts.</p>";
     return;
   }
-  if (status.qr) {
+
+  const restoring = isWhatsAppSessionRestoring(status);
+  if (restoring) {
+    lastRenderedWhatsAppQr = null;
+    const pct = Number(status.loadingPercent) || 0;
+    const progress =
+      pct > 0
+        ? `Loading WhatsApp Web… ${pct}%`
+        : status.phase === "authenticating"
+          ? "Authenticated — finishing connection…"
+          : "Restoring saved WhatsApp session…";
     body.innerHTML = `
-      <p>Open WhatsApp on your phone → <strong>Linked Devices</strong> → scan this QR code (one-time setup).</p>
+      <p><strong>${progress}</strong></p>
+      <p>You already linked WhatsApp — <strong>no scan needed</strong> unless a QR appears below. On Railway this can take 2–3 minutes after deploy.</p>
+      <p class="hint">${status.lastError || "Keep this page open while the server finishes restoring the session."}</p>
+      <p><button type="button" class="btn btn-outline btn-sm" id="waResetBtn">Reset connection</button></p>
+    `;
+    bindWhatsAppResetButton();
+    return;
+  }
+
+  if (status.qr) {
+    if (lastRenderedWhatsAppQr === status.qr && body.querySelector(".wa-qr-image")) return;
+    lastRenderedWhatsAppQr = status.qr;
+    body.innerHTML = `
+      <p><strong>One-time setup:</strong> open WhatsApp on your phone → <strong>Linked Devices</strong> → <strong>Link a Device</strong>, then scan this QR.</p>
+      <p class="hint">After the first scan, the session stays saved — you won't need to scan again.</p>
       <img class="wa-qr-image" src="${status.qr}" alt="WhatsApp QR code" width="280" height="280">
       <p><button type="button" class="btn btn-outline btn-sm" id="waResetBtn">Reset connection</button></p>
     `;
-    $("#waResetBtn")?.addEventListener("click", async () => {
-      await api("/api/whatsapp/reset", { method: "POST" });
-      pollWhatsAppModal();
-    });
+    bindWhatsAppResetButton();
     return;
   }
-  body.innerHTML = `<p>${status.lastError || "Waiting for WhatsApp…"}</p>`;
+
+  lastRenderedWhatsAppQr = null;
+  body.innerHTML = `
+    <p>${status.lastError || "Waiting for WhatsApp…"}</p>
+    <p class="hint">If this is your first time, a QR code will appear shortly.</p>
+    <p><button type="button" class="btn btn-outline btn-sm" id="waResetBtn">Reset connection</button></p>
+  `;
+  bindWhatsAppResetButton();
 }
 
 function openWhatsAppModal() {
@@ -218,6 +308,7 @@ async function pollWhatsAppModal(startBridge = false) {
   if (status?.ready) {
     if (waPollTimer) clearInterval(waPollTimer);
     waPollTimer = null;
+    setTimeout(closeWhatsAppModal, 1500);
     return;
   }
   if (!waPollTimer) {
@@ -339,8 +430,3 @@ $("#refreshBtn").addEventListener("click", () => loadDashboard().catch(console.e
   showLogin();
 })();
 
-setInterval(() => {
-  if (!appView.classList.contains("hidden") && $("#waModal")?.classList.contains("hidden")) {
-    refreshWhatsAppStatus().catch(() => {});
-  }
-}, 15000);

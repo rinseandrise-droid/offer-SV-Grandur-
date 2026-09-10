@@ -25,8 +25,10 @@ const WA_WEB_VERSION =
   process.env.WHATSAPP_WEB_VERSION || "2.3000.1046691727-alpha";
 
 const AUTH_READY_TIMEOUT_MS = Number(
-  process.env.WHATSAPP_AUTH_TIMEOUT_MS || (IS_HOSTED ? 360000 : 180000)
+  process.env.WHATSAPP_AUTH_TIMEOUT_MS || (IS_HOSTED ? 420000 : 180000)
 );
+const RESTORE_QR_GRACE_MS = Number(process.env.WHATSAPP_RESTORE_GRACE_MS || (IS_HOSTED ? 180000 : 90000));
+const CLIENT_ID = process.env.WHATSAPP_CLIENT_ID || "sv-grandur";
 
 const state = {
   ready: false,
@@ -48,26 +50,49 @@ let sendInProgress = false;
 const LOCK_FILE = path.join(AUTH_DIR, ".bridge.lock");
 const SESSION_LINKED_FILE = path.join(AUTH_DIR, ".session-linked");
 let lastReconnectAt = 0;
+let bridgeStartedAt = Date.now();
 
 function ensureAuthDirs() {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   fs.mkdirSync(CACHE_DIR, { recursive: true });
 }
 
-/** Move session from old whatsapp-bridge/.wwebjs_auth to data/whatsapp-auth once. */
+function sessionDirFor(clientId) {
+  return path.join(AUTH_DIR, `session-${clientId}`);
+}
+
+/** Move session from old whatsapp-bridge/.wwebjs_auth or billing client id to this app once. */
 function migrateLegacyAuthDir() {
-  if (!LEGACY_AUTH_DIR || path.resolve(LEGACY_AUTH_DIR) === path.resolve(AUTH_DIR)) return;
+  ensureAuthDirs();
+  const targetSession = sessionDirFor(CLIENT_ID);
+  const legacySources = [
+    path.join(LEGACY_AUTH_DIR, "session-rinse-rise"),
+    path.join(AUTH_DIR, "session-rinse-rise"),
+    path.join(LEGACY_AUTH_DIR, "session-sv-grandur"),
+  ].filter((p) => p && path.resolve(path.dirname(p)) !== path.resolve(targetSession));
+
   try {
-    const legacySession = path.join(LEGACY_AUTH_DIR, "session-rinse-rise");
-    const newSession = path.join(AUTH_DIR, "session-rinse-rise");
-    if (fs.existsSync(legacySession) && !fs.existsSync(newSession)) {
-      console.log("[WhatsApp] Migrating saved session to persistent data folder…");
-      fs.cpSync(LEGACY_AUTH_DIR, AUTH_DIR, { recursive: true });
-    } else if (fs.existsSync(path.join(LEGACY_AUTH_DIR, ".session-linked")) && !hasSessionLinked()) {
-      fs.copyFileSync(
-        path.join(LEGACY_AUTH_DIR, ".session-linked"),
-        path.join(AUTH_DIR, ".session-linked")
-      );
+    if (!fs.existsSync(targetSession)) {
+      for (const legacySession of legacySources) {
+        if (fs.existsSync(legacySession)) {
+          console.log(`[WhatsApp] Migrating saved session from ${legacySession}…`);
+          fs.cpSync(legacySession, targetSession, { recursive: true });
+          markSessionLinked();
+          break;
+        }
+      }
+    }
+
+    if (
+      LEGACY_AUTH_DIR &&
+      path.resolve(LEGACY_AUTH_DIR) !== path.resolve(AUTH_DIR) &&
+      fs.existsSync(LEGACY_AUTH_DIR)
+    ) {
+      const legacyLinked = path.join(LEGACY_AUTH_DIR, ".session-linked");
+      if (fs.existsSync(legacyLinked) && !hasSessionLinked()) {
+        fs.copyFileSync(legacyLinked, SESSION_LINKED_FILE);
+        state.sessionLinked = true;
+      }
     }
   } catch (err) {
     console.warn("[WhatsApp] Legacy auth migration:", err.message);
@@ -417,7 +442,7 @@ function createClient() {
   // Always pin a known-good local WA Web HTML. Remote "latest" often authenticates
   // but never fires ready (breaks QR linking).
   const clientOptions = {
-    authStrategy: new LocalAuth({ dataPath: AUTH_DIR, clientId: "rinse-rise" }),
+    authStrategy: new LocalAuth({ dataPath: AUTH_DIR, clientId: CLIENT_ID }),
     puppeteer: puppeteerConfig,
     takeoverOnConflict: false,
     takeoverTimeoutMs: 0,
@@ -433,24 +458,38 @@ function createClient() {
 
 function bindClientEvents(waClient) {
   waClient.on("qr", async (qr) => {
+    const linked = hasSessionLinked();
+    const inRestoreGrace = linked && Date.now() - bridgeStartedAt < RESTORE_QR_GRACE_MS;
+
     state.ready = false;
-    state.phase = hasSessionLinked() ? "reconnecting" : "qr";
-    state.loadingPercent = 0;
-    state.lastError = hasSessionLinked()
-      ? "Session expired — scan QR once to link again, or wait while we retry restoring the saved session."
-      : null;
     state.authenticatingSince = null;
     clearTimeout(authTimer);
+
+    if (inRestoreGrace) {
+      state.phase = "restoring";
+      state.qr = null;
+      state.lastError =
+        "Restoring saved WhatsApp session — no scan needed. This can take 2–3 minutes on the server.";
+      console.log("[WhatsApp] QR during restore grace — keeping saved session, still restoring…");
+      startConnectedPoll(waClient);
+      return;
+    }
+
+    state.phase = linked ? "reconnecting" : "qr";
+    state.loadingPercent = 0;
+    state.lastError = linked
+      ? "Saved session expired — scan QR once to link again."
+      : null;
     try {
       state.qr = await QRCode.toDataURL(qr, { margin: 1, width: 280 });
     } catch (err) {
       state.lastError = "Could not render QR code.";
       console.error("[WhatsApp] QR render failed:", err.message);
     }
-    if (hasSessionLinked()) {
-      console.log("[WhatsApp] Saved session needs re-link — scan QR in the billing app.");
+    if (linked) {
+      console.log("[WhatsApp] Saved session needs re-link — scan QR in the admin app.");
     } else {
-      console.log("[WhatsApp] Scan QR code in the billing app to connect (one-time setup).");
+      console.log("[WhatsApp] Scan QR code once to connect (one-time setup).");
     }
   });
 
@@ -555,6 +594,7 @@ async function destroyClient() {
 }
 
 async function initializeClient() {
+  bridgeStartedAt = Date.now();
   await destroyClient();
   client = createClient();
   bindClientEvents(client);
@@ -843,7 +883,12 @@ async function performSendText(digits, message) {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    ready: state.ready,
+    phase: state.phase,
+    sessionLinked: state.sessionLinked || hasSessionLinked(),
+  });
 });
 
 app.get("/status", (_req, res) => {

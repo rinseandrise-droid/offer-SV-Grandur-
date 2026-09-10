@@ -60,7 +60,8 @@ Open **http://localhost:8080**
 | `PORT` | Auto | Railway sets this |
 
 6. Deploy → open your Railway URL → sign in
-7. Click **Connect WhatsApp** → scan QR once (session persists on the volume)
+7. Click **Connect WhatsApp** → scan QR **once** (session saves to the volume — no scan needed after redeploys)
+8. First connect on Railway can take **2–3 minutes**; status shows **Restoring session…** if already linked
 
 Health check: `GET /api/live`
 
