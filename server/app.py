@@ -18,7 +18,11 @@ from database import (
     list_coupons,
     list_history,
 )
-from whatsapp_send import get_bridge_status, send_coupon_whatsapp
+from whatsapp_send import (
+    get_bridge_status,
+    reset_bridge_session,
+    send_coupon_whatsapp,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 ADMIN_PASSWORD = os.environ.get("SV_GRANGES_ADMIN_PASSWORD", "SVGranges@22")
@@ -27,6 +31,11 @@ SESSIONS: dict[str, str] = {}
 app = Flask(__name__, static_folder=str(ROOT), static_url_path="")
 
 init_db()
+
+
+@app.get("/api/live")
+def live():
+    return jsonify({"ok": True})
 
 
 def _token_ok(token: str | None) -> bool:
@@ -97,7 +106,14 @@ def history():
 @app.get("/api/whatsapp/status")
 @require_admin
 def whatsapp_status():
-    return jsonify(get_bridge_status())
+    auto_start = request.args.get("start", "").lower() in ("1", "true", "yes")
+    return jsonify(get_bridge_status(auto_start=auto_start))
+
+
+@app.post("/api/whatsapp/reset")
+@require_admin
+def whatsapp_reset():
+    return jsonify(reset_bridge_session())
 
 
 @app.post("/api/send")

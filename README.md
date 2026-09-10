@@ -12,47 +12,61 @@ Admin tool to send **300 exclusive discount coupons** to SV Granges residents on
 | 10% off | 140 | SVGR-061 … SVGR-200 |
 | 20% off | 100 | SVGR-201 … SVGR-300 |
 
-Each code can only be used **once**. After you send it to a customer, it is marked as used.
-
 ## Run locally
 
-1. **WhatsApp:** Start the billing app once (`laundry-billing\Start Billing.bat`) and link WhatsApp via QR — the same session is reused here.
-2. Double-click **`Start SV Granges Offer.bat`**
-3. Open **http://localhost:5090**
-4. Sign in with admin password: **`SVGranges@22`**
+Double-click **`Start SV Granges Offer.bat`** or:
+
+```bash
+cd server
+pip install -r ../requirements.txt
+python app.py
+```
+
+Open **http://localhost:5090** — password: **`SVGranges@22`**
+
+## Docker (local test)
+
+```bash
+docker build -t sv-granges-offer .
+docker run --rm -p 8080:8080 -v sv-granges-data:/app/data sv-granges-offer
+```
+
+Open **http://localhost:8080**
+
+## Deploy on Railway
+
+1. Connect repo: [rinseandrise-droid/offer-SV-Grandur-](https://github.com/rinseandrise-droid/offer-SV-Grandur-)
+2. Railway auto-detects **`Dockerfile`** via `railway.toml`
+3. Add a **Volume** mounted at **`/app/data`** (keeps coupons DB + WhatsApp session)
+4. Set environment variables:
+
+| Variable | Required | Example |
+|----------|----------|---------|
+| `SV_GRANGES_ADMIN_PASSWORD` | Yes | Your secure admin password |
+| `WHATSAPP_ENABLED` | No | `1` (default) |
+| `PORT` | Auto | Railway sets this |
+
+5. Deploy → open your Railway URL → sign in
+6. Click **Connect WhatsApp** → scan QR once (session persists on the volume)
+
+Health check: `GET /api/live`
 
 ## Admin workflow
 
-1. Enter **customer name** and **phone number**
-2. Pick an **available coupon code** from the dropdown
-3. Click **Send coupon on WhatsApp**
-
-The customer receives a WhatsApp message with their code, discount %, and your Google review link.
+1. **Connect WhatsApp** (one-time QR scan)
+2. Enter customer **name** and **phone**
+3. Pick an **available coupon code**
+4. Click **Send coupon on WhatsApp**
 
 ## Configuration
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SV_GRANGES_ADMIN_PASSWORD` | `SVGranges@22` | Admin login |
-| `WHATSAPP_BRIDGE_URL` | `http://127.0.0.1:3001` | Billing WhatsApp bridge |
-| `PORT` | `5090` | This app's port |
-
-## Folder layout
-
-```
-offer 2(SV Granges)/
-  Start SV Granges Offer.bat
-  index.html
-  css/styles.css
-  js/app.js
-  server/
-    app.py
-    database.py
-    whatsapp_send.py
-  data/
-    sv-granges.db    ← created on first run
-```
+| `DATA_DIR` | `/app/data` | SQLite + WhatsApp auth |
+| `WHATSAPP_BRIDGE_URL` | `http://127.0.0.1:3001` | Internal bridge |
+| `PORT` | `8080` (Docker) / `5090` (local) | Web port |
 
 ## Reset all coupons
 
-Stop the app, delete `data/sv-granges.db`, and restart — 300 fresh codes are seeded automatically.
+Delete `data/sv-granges.db` (or wipe the Railway volume) and restart — 300 fresh codes are seeded automatically.

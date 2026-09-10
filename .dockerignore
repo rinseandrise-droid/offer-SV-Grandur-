@@ -1,0 +1,12 @@
+.git
+.gitignore
+data/
+__pycache__/
+*.pyc
+.env
+*.md
+Start *.bat
+whatsapp-bridge/node_modules
+whatsapp-bridge/.wwebjs_auth
+whatsapp-bridge/.wwebjs_cache
+whatsapp-bridge/bridge.log

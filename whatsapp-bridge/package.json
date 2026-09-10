@@ -1,0 +1,15 @@
+{
+  "name": "rinse-rise-whatsapp-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local WhatsApp bridge for sending invoice PDFs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "1.34.7"
+  }
+}

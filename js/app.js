@@ -146,24 +146,88 @@ function renderHistory(rows) {
     .join("");
 }
 
-async function refreshWhatsAppStatus() {
+let waPollTimer = null;
+
+async function refreshWhatsAppStatus(startBridge = false) {
   try {
-    const status = await api("/api/whatsapp/status");
+    const q = startBridge ? "?start=1" : "";
+    const status = await api(`/api/whatsapp/status${q}`);
     if (status.ready) {
       waStatusPill.textContent = "WhatsApp Ready";
       waStatusPill.className = "status-pill ready";
+    } else if (status.sessionRestoring) {
+      waStatusPill.textContent = "WhatsApp restoring…";
+      waStatusPill.className = "status-pill";
     } else if (status.available) {
       waStatusPill.textContent = "WhatsApp connecting…";
       waStatusPill.className = "status-pill";
     } else {
-      waStatusPill.textContent = "WhatsApp offline — start billing app";
+      waStatusPill.textContent = "WhatsApp offline";
       waStatusPill.className = "status-pill offline";
     }
+    return status;
   } catch {
     waStatusPill.textContent = "WhatsApp status unknown";
     waStatusPill.className = "status-pill offline";
+    return null;
   }
 }
+
+function renderWhatsAppModal(status) {
+  const body = $("#waModalBody");
+  if (!body) return;
+  if (!status) {
+    body.innerHTML = "<p>Could not load WhatsApp status.</p>";
+    return;
+  }
+  if (status.ready) {
+    body.innerHTML = "<p><strong>WhatsApp is connected!</strong></p><p>You can send coupon messages to customers.</p>";
+    return;
+  }
+  if (status.qr) {
+    body.innerHTML = `
+      <p>Open WhatsApp on your phone → <strong>Linked Devices</strong> → scan this QR code (one-time setup).</p>
+      <img class="wa-qr-image" src="${status.qr}" alt="WhatsApp QR code" width="280" height="280">
+      <p><button type="button" class="btn btn-outline btn-sm" id="waResetBtn">Reset connection</button></p>
+    `;
+    $("#waResetBtn")?.addEventListener("click", async () => {
+      await api("/api/whatsapp/reset", { method: "POST" });
+      pollWhatsAppModal();
+    });
+    return;
+  }
+  body.innerHTML = `<p>${status.lastError || "Waiting for WhatsApp…"}</p>`;
+}
+
+function openWhatsAppModal() {
+  $("#waModal")?.classList.remove("hidden");
+  pollWhatsAppModal(true);
+}
+
+function closeWhatsAppModal() {
+  $("#waModal")?.classList.add("hidden");
+  if (waPollTimer) {
+    clearInterval(waPollTimer);
+    waPollTimer = null;
+  }
+}
+
+async function pollWhatsAppModal(startBridge = false) {
+  const status = await refreshWhatsAppStatus(startBridge);
+  renderWhatsAppModal(status);
+  if (status?.ready) {
+    if (waPollTimer) clearInterval(waPollTimer);
+    waPollTimer = null;
+    return;
+  }
+  if (!waPollTimer) {
+    waPollTimer = setInterval(() => pollWhatsAppModal(false), 2000);
+  }
+}
+
+$("#waConnectBtn")?.addEventListener("click", openWhatsAppModal);
+$("#waModalClose")?.addEventListener("click", closeWhatsAppModal);
+$("#waModalBackdrop")?.addEventListener("click", closeWhatsAppModal);
 
 async function loadDashboard() {
   const [summary, coupons, history] = await Promise.all([
@@ -276,7 +340,7 @@ $("#refreshBtn").addEventListener("click", () => loadDashboard().catch(console.e
 })();
 
 setInterval(() => {
-  if (!appView.classList.contains("hidden")) {
+  if (!appView.classList.contains("hidden") && $("#waModal")?.classList.contains("hidden")) {
     refreshWhatsAppStatus().catch(() => {});
   }
 }, 15000);
