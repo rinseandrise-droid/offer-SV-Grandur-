@@ -1,4 +1,15 @@
-data/
+# Runtime data (SQLite + WhatsApp session) — not committed
+data/sv-granges.db
+data/coupons-backup.json
+data/whatsapp-auth/
+data/whatsapp-cache/
+data/.persistent_volume
+data/whatsapp-bridge.log
+
+# Keep coupon seed in GitHub
+!data/coupons-seed.json
+!data/.gitkeep
+
 __pycache__/
 *.pyc
 .env

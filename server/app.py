@@ -12,11 +12,14 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from database import (
     assign_coupon,
+    export_all,
     get_coupon_by_code,
+    get_storage_info,
     get_summary,
     init_db,
     list_coupons,
     list_history,
+    write_backup,
 )
 from whatsapp_send import (
     get_bridge_status,
@@ -101,6 +104,25 @@ def coupon_detail(code: str):
 @require_admin
 def history():
     return jsonify(list_history())
+
+
+@app.get("/api/storage")
+@require_admin
+def storage_info():
+    return jsonify(get_storage_info())
+
+
+@app.get("/api/export")
+@require_admin
+def export_coupons():
+    return jsonify(export_all())
+
+
+@app.post("/api/backup")
+@require_admin
+def backup_now():
+    path = write_backup()
+    return jsonify({"ok": True, "backupFile": str(path), "storage": get_storage_info()})
 
 
 @app.get("/api/whatsapp/status")
