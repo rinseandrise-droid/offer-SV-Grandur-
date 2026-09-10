@@ -103,7 +103,7 @@ def get_bridge_status(*, auto_start: bool = False) -> dict[str, Any]:
                 if hosted and session_linked
                 else "Starting WhatsApp scanner — QR will appear shortly."
                 if hosted
-                else "WhatsApp bridge not running. Start the app with Docker or Start SV Granges Offer.bat."
+                else "WhatsApp bridge not running. Start the app with Docker or Start SV Grandur Offer.bat."
             ),
             "phase": "restoring" if session_linked else "starting",
             "sessionLinked": session_linked,
@@ -142,7 +142,7 @@ def build_coupon_message(coupon: dict[str, Any]) -> str:
     return (
         f"Hi {name},\n\n"
         f"Congratulations! 🎉\n\n"
-        f"Your exclusive *SV Granges* offer from *Rinse & Rise Laundryrite*:\n\n"
+        f"Your exclusive *SV Grandur* offer from *Rinse & Rise Laundryrite*:\n\n"
         f"*Coupon Code:* {code}\n"
         f"*Discount:* {discount}% OFF\n\n"
         f"Show this code when you place your laundry order.\n"

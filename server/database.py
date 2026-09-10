@@ -1,4 +1,4 @@
-"""SQLite storage for SV Granges coupon campaign (same app — no separate DB)."""
+"""SQLite storage for SV Grandur coupon campaign (same app — no separate DB)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT / "data")))
-DB_PATH = DATA_DIR / "sv-granges.db"
+DB_PATH = DATA_DIR / "sv-grandur.db"
 SEED_PATH = ROOT / "data" / "coupons-seed.json"
 BACKUP_PATH = DATA_DIR / "coupons-backup.json"
 
@@ -72,7 +72,7 @@ def _seed_coupons(conn: sqlite3.Connection) -> None:
         rows = []
         for discount, qty in COUPON_TIERS:
             for _ in range(qty):
-                rows.append((f"SVGR-{seq:03d}", discount, now))
+                rows.append((f"SVGD-{seq:03d}", discount, now))
                 seq += 1
 
     conn.executemany(

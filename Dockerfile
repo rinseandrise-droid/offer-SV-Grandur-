@@ -1,4 +1,4 @@
-# SV Granges coupon admin + WhatsApp bridge (Railway / Docker)
+# SV Grandur coupon admin + WhatsApp bridge (Railway / Docker)
 FROM node:20-bookworm-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

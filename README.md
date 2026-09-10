@@ -1,6 +1,6 @@
-# SV Granges — Coupon Campaign Admin
+# SV Grandur — Coupon Campaign Admin
 
-Admin tool to send **300 exclusive discount coupons** to SV Granges residents on WhatsApp.
+Admin tool to send **300 exclusive discount coupons** to SV Grandur residents on WhatsApp.
 
 **No separate PostgreSQL database.** All coupon data lives in this same app using a small SQLite file on a Railway volume (~300 rows).
 
@@ -8,25 +8,25 @@ Admin tool to send **300 exclusive discount coupons** to SV Granges residents on
 
 | Discount | Count | Code range |
 |----------|------:|------------|
-| 50% off | 3 | SVGR-001 … SVGR-003 |
-| 40% off | 7 | SVGR-004 … SVGR-010 |
-| 30% off | 50 | SVGR-011 … SVGR-060 |
-| 10% off | 140 | SVGR-061 … SVGR-200 |
-| 20% off | 100 | SVGR-201 … SVGR-300 |
+| 50% off | 3 | SVGD-001 … SVGD-003 |
+| 40% off | 7 | SVGD-004 … SVGD-010 |
+| 30% off | 50 | SVGD-011 … SVGD-060 |
+| 10% off | 140 | SVGD-061 … SVGD-200 |
+| 20% off | 100 | SVGD-201 … SVGD-300 |
 
 ## How data is stored
 
 | File | In GitHub | Purpose |
 |------|-----------|---------|
 | `data/coupons-seed.json` | Yes | All 300 coupon codes (source of truth) |
-| `data/sv-granges.db` | No | Live SQLite DB (who used which coupon) |
+| `data/sv-grandur.db` | No | Live SQLite DB (who used which coupon) |
 | `data/coupons-backup.json` | No | Auto JSON backup after each send |
 
 On first deploy, the app reads `coupons-seed.json` from the repo and creates the SQLite database. Every time a coupon is sent, a JSON backup is written to the volume so data is safe even though it is small.
 
 ## Run locally
 
-Double-click **`Start SV Granges Offer.bat`** or:
+Double-click **`Start SV Grandur Offer.bat`** or:
 
 ```bash
 cd server
@@ -34,13 +34,13 @@ pip install -r ../requirements.txt
 python app.py
 ```
 
-Open **http://localhost:5090** — password: **`SVGranges@22`**
+Open **http://localhost:5090** — password: **`SVGrandur@22`**
 
 ## Docker (local test)
 
 ```bash
-docker build -t sv-granges-offer .
-docker run --rm -p 8080:8080 -v sv-granges-data:/app/data sv-granges-offer
+docker build -t sv-grandur-offer .
+docker run --rm -p 8080:8080 -v sv-grandur-data:/app/data sv-grandur-offer
 ```
 
 Open **http://localhost:8080**
@@ -55,7 +55,7 @@ Open **http://localhost:8080**
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `SV_GRANGES_ADMIN_PASSWORD` | Yes | Your secure admin password |
+| `SV_GRANDUR_ADMIN_PASSWORD` | Yes | Your secure admin password |
 | `WHATSAPP_ENABLED` | No | `1` (default) |
 | `PORT` | Auto | Railway sets this |
 
@@ -83,11 +83,11 @@ Health check: `GET /api/live`
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SV_GRANGES_ADMIN_PASSWORD` | `SVGranges@22` | Admin login |
+| `SV_GRANDUR_ADMIN_PASSWORD` | `SVGrandur@22` | Admin login |
 | `DATA_DIR` | `/app/data` | SQLite + backup + WhatsApp auth |
 | `WHATSAPP_BRIDGE_URL` | `http://127.0.0.1:3001` | Internal bridge |
 | `PORT` | `8080` (Docker) / `5090` (local) | Web port |
 
 ## Reset all coupons
 
-Delete `data/sv-granges.db` and `data/coupons-backup.json` on the volume (or wipe the Railway volume) and restart — 300 fresh codes are seeded from `data/coupons-seed.json` in GitHub.
+Delete `data/sv-grandur.db` and `data/coupons-backup.json` on the volume (or wipe the Railway volume) and restart — 300 fresh codes are seeded from `data/coupons-seed.json` in GitHub.

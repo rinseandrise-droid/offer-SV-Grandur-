@@ -1,4 +1,4 @@
-"""SV Granges coupon admin — Flask API."""
+"""SV Grandur coupon admin — Flask API."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from whatsapp_send import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-ADMIN_PASSWORD = os.environ.get("SV_GRANGES_ADMIN_PASSWORD", "SVGranges@22")
+ADMIN_PASSWORD = os.environ.get("SV_GRANDUR_ADMIN_PASSWORD", "SVGrandur@22")
 SESSIONS: dict[str, str] = {}
 
 app = Flask(__name__, static_folder=str(ROOT), static_url_path="")

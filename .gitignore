@@ -1,4 +1,5 @@
 # Runtime data (SQLite + WhatsApp session) — not committed
+data/sv-grandur.db
 data/sv-granges.db
 data/coupons-backup.json
 data/whatsapp-auth/

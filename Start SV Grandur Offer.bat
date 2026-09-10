@@ -1,5 +1,5 @@
 @echo off
-title SV Granges — Coupon Admin
+title SV Grandur — Coupon Admin
 setlocal
 
 set "ROOT=%~dp0"
@@ -7,7 +7,7 @@ set "BILLING=%ROOT%..\laundry-billing"
 set "PORT=5090"
 
 echo.
-echo  SV Granges Coupon Campaign
+echo  SV Grandur Coupon Campaign
 echo  ==========================
 echo.
 
@@ -33,13 +33,13 @@ if errorlevel 1 (
 )
 
 echo  [2/2] Starting coupon admin on http://localhost:%PORT%
-start "SV Granges Admin" cmd /k "cd /d \"%ROOT%server\" && python app.py"
+start "SV Grandur Admin" cmd /k "cd /d \"%ROOT%server\" && python app.py"
 
 timeout /t 2 /nobreak >nul
 start http://localhost:%PORT%/
 
 echo.
-echo  Admin login password: SVGranges@22
-echo  ^(change via SV_GRANGES_ADMIN_PASSWORD environment variable^)
+echo  Admin login password: SVGrandur@22
+echo  ^(change via SV_GRANDUR_ADMIN_PASSWORD environment variable^)
 echo.
 pause

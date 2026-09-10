@@ -1,6 +1,6 @@
 .git
 .gitignore
-data/sv-granges.db
+data/sv-grandur.db
 data/coupons-backup.json
 data/whatsapp-auth/
 data/whatsapp-cache/

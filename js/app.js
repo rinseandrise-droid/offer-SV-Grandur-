@@ -1,4 +1,4 @@
-const TOKEN_KEY = "sv_granges_token";
+const TOKEN_KEY = "sv_grandur_token";
 
 const $ = (sel) => document.querySelector(sel);
 
