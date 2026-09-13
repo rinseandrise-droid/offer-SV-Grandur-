@@ -16,6 +16,7 @@ REVIEW_URL = os.environ.get(
     "GOOGLE_REVIEW_URL",
     "https://g.page/r/CaSto0sK11yGEAE/review",
 )
+OFFER_VALID_UNTIL = os.environ.get("OFFER_VALID_UNTIL", "30/09/2026")
 
 
 def is_cloud_deployment() -> bool:
@@ -144,7 +145,8 @@ def build_coupon_message(coupon: dict[str, Any]) -> str:
         f"Congratulations! 🎉\n\n"
         f"Your exclusive *SV Grandur* offer from *Rinse & Rise Laundryrite*:\n\n"
         f"*Coupon Code:* {code}\n"
-        f"*Discount:* {discount}% OFF\n\n"
+        f"*Discount:* {discount}% OFF\n"
+        f"*Valid till:* {OFFER_VALID_UNTIL}\n\n"
         f"Show this code when you place your laundry order.\n"
         f"Free Pickup & Delivery\n"
         f"Call: {SHOP_PHONE} | {SHOP_HOURS}\n\n"

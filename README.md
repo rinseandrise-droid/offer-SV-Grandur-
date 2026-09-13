@@ -2,8 +2,6 @@
 
 Admin tool to send **300 exclusive discount coupons** to SV Grandur residents on WhatsApp.
 
-**No separate PostgreSQL database.** All coupon data lives in this same app using a small SQLite file on a Railway volume (~300 rows).
-
 ## Coupon pool (300 total)
 
 | Discount | Count | Code range |
@@ -16,17 +14,16 @@ Admin tool to send **300 exclusive discount coupons** to SV Grandur residents on
 
 ## How data is stored
 
-| File | In GitHub | Purpose |
-|------|-----------|---------|
-| `data/coupons-seed.json` | Yes | All 300 coupon codes (source of truth) |
-| `data/sv-grandur.db` | No | Live SQLite DB (who used which coupon) |
-| `data/coupons-backup.json` | No | Auto JSON backup after each send |
+When you submit the form (customer name, phone, coupon), the offer is **saved in the database** immediately.
 
-On first deploy, the app reads `coupons-seed.json` from the repo and creates the SQLite database. Every time a coupon is sent, a JSON backup is written to the volume so data is safe even though it is small.
+| Environment | Storage |
+|-------------|---------|
+| **Railway (production)** | **PostgreSQL** via `DATABASE_URL` |
+| **Local dev** | SQLite file `data/sv-grandur.db` (if no `DATABASE_URL`) |
+
+WhatsApp session files still use the Railway volume at `/app/data/whatsapp-auth`.
 
 ## Run locally
-
-Double-click **`Start SV Grandur Offer.bat`** or:
 
 ```bash
 cd server
@@ -36,59 +33,45 @@ python app.py
 
 Open **http://localhost:5090** — password: **`SVGrandur@22`**
 
-## Docker (local test)
+Or double-click **`Start SV Grandur Offer.bat`**
 
-```bash
-docker build -t sv-grandur-offer .
-docker run --rm -p 8080:8080 -v sv-grandur-data:/app/data sv-grandur-offer
-```
-
-Open **http://localhost:8080**
-
-## Deploy on Railway (no Postgres)
+## Deploy on Railway
 
 1. Connect repo: [rinseandrise-droid/offer-SV-Grandur-](https://github.com/rinseandrise-droid/offer-SV-Grandur-)
-2. Railway auto-detects **`Dockerfile`** via `railway.toml`
-3. **Do not add PostgreSQL** — you only need this app service.
-4. Add a **Volume** mounted at **`/app/data`** (keeps SQLite DB + JSON backup + WhatsApp session)
-5. Set environment variables:
+2. Add **PostgreSQL** service in the same Railway project
+3. On the **web app service** → **Variables** → **Variable Reference**:
+   - From Postgres → **`DATABASE_PRIVATE_URL`** → name it **`DATABASE_URL`**
+   - Also add **`DATABASE_PUBLIC_URL`** from Postgres (fallback if internal DNS fails)
+4. Add **Volume** at **`/app/data`** (for WhatsApp session only)
+5. Set **`SV_GRANDUR_ADMIN_PASSWORD`**
+6. Deploy
 
-| Variable | Required | Example |
-|----------|----------|---------|
-| `SV_GRANDUR_ADMIN_PASSWORD` | Yes | Your secure admin password |
-| `WHATSAPP_ENABLED` | No | `1` (default) |
-| `PORT` | Auto | Railway sets this |
+**Do not paste the database password in GitHub.** Set `DATABASE_URL` only in Railway Variables.
 
-6. Deploy → open your Railway URL → sign in
-7. Click **Connect WhatsApp** → scan QR **once** (session saves to the volume — no scan needed after redeploys)
-8. First connect on Railway can take **2–3 minutes**; status shows **Restoring session…** if already linked
+### Verify database
 
-Health check: `GET /api/live`
+Open: `https://YOUR-APP.up.railway.app/api/health`
 
-### Admin API (backup)
+```json
+{
+  "ok": true,
+  "database": "postgresql",
+  "dbOk": true
+}
+```
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/storage` | Where data is saved |
-| `GET /api/export` | Download full coupon JSON |
-| `POST /api/backup` | Force JSON backup now |
+## Configuration
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection (Railway) |
+| `SV_GRANDUR_ADMIN_PASSWORD` | Admin login |
+| `OFFER_VALID_UNTIL` | Shown in WhatsApp message (default `30/09/2026`) |
+| `DATA_DIR` | WhatsApp auth on volume (`/app/data`) |
 
 ## Admin workflow
 
 1. **Connect WhatsApp** (one-time QR scan)
 2. Enter customer **name** and **phone**
 3. Pick an **available coupon code**
-4. Click **Send coupon on WhatsApp**
-
-## Configuration
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `SV_GRANDUR_ADMIN_PASSWORD` | `SVGrandur@22` | Admin login |
-| `DATA_DIR` | `/app/data` | SQLite + backup + WhatsApp auth |
-| `WHATSAPP_BRIDGE_URL` | `http://127.0.0.1:3001` | Internal bridge |
-| `PORT` | `8080` (Docker) / `5090` (local) | Web port |
-
-## Reset all coupons
-
-Delete `data/sv-grandur.db` and `data/coupons-backup.json` on the volume (or wipe the Railway volume) and restart — 300 fresh codes are seeded from `data/coupons-seed.json` in GitHub.
+4. Click **Send coupon on WhatsApp** — saved to PostgreSQL + WhatsApp sent

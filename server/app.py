@@ -10,6 +10,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
+from db import database_backend_name, database_config_status
 from database import (
     assign_coupon,
     export_all,
@@ -39,6 +40,26 @@ init_db()
 @app.get("/api/live")
 def live():
     return jsonify({"ok": True})
+
+
+@app.get("/api/health")
+def health():
+    db_status = database_config_status()
+    db_ok = True
+    try:
+        get_summary()
+    except Exception as exc:
+        db_ok = False
+        db_status["error"] = str(exc)
+    return jsonify(
+        {
+            "ok": db_ok,
+            "database": database_backend_name(),
+            "dbOk": db_ok,
+            **db_status,
+            "persistence": get_storage_info(),
+        }
+    )
 
 
 def _token_ok(token: str | None) -> bool:
