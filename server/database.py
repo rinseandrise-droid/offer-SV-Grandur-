@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 from datetime import datetime, timezone
@@ -387,6 +389,51 @@ def list_history(limit: int = 100) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
         return [_row_dict(r) for r in rows]
+
+
+def list_all_sent() -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM coupons
+            WHERE status = 'used'
+            ORDER BY sent_at DESC
+            """
+        ).fetchall()
+        return [_row_dict(r) for r in rows]
+
+
+def _format_sent_at(value: Any) -> str:
+    if not value:
+        return ""
+    text = str(value)
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return dt.astimezone(timezone.utc).strftime("%d-%m-%Y %H:%M")
+    except ValueError:
+        return text
+
+
+def build_sent_excel_csv() -> bytes:
+    """CSV with UTF-8 BOM — opens directly in Microsoft Excel."""
+    rows = list_all_sent()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["Coupon Code", "Discount %", "Customer Name", "Phone", "Sent At", "Status"]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                row.get("code") or "",
+                row.get("discount_percent") or "",
+                row.get("customer_name") or "",
+                row.get("customer_phone") or "",
+                _format_sent_at(row.get("sent_at")),
+                row.get("status") or "",
+            ]
+        )
+    return ("\ufeff" + buffer.getvalue()).encode("utf-8")
 
 
 def export_all() -> dict[str, Any]:

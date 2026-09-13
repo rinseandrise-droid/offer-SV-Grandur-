@@ -8,11 +8,12 @@ import secrets
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 from db import database_backend_name, database_config_status
 from database import (
     assign_coupon,
+    build_sent_excel_csv,
     cancel_coupon,
     export_all,
     get_coupon_by_code,
@@ -158,6 +159,21 @@ def coupon_cancel(code: str):
 @require_admin
 def history():
     return jsonify(list_history())
+
+
+@app.get("/api/export/sent.xlsx")
+@require_admin
+def export_sent_excel():
+    """Excel-compatible CSV download of all sent coupons."""
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    filename = f"sv-grandur-sent-coupons-{stamp}.csv"
+    return Response(
+        build_sent_excel_csv(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/storage")

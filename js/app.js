@@ -459,6 +459,44 @@ sendForm.addEventListener("submit", async (e) => {
 
 $("#refreshBtn").addEventListener("click", () => loadDashboard().catch(console.error));
 
+async function downloadSentExcel() {
+  const btn = $("#downloadExcelBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const token = getToken();
+    const res = await fetch("/api/export/sent.xlsx", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.status === 401) {
+      setToken("");
+      showLogin();
+      throw new Error("Session expired. Please sign in again.");
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Download failed");
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] || "sv-grandur-sent-coupons.csv";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+$("#downloadExcelBtn")?.addEventListener("click", () => {
+  downloadSentExcel().catch((err) => alert(err.message || "Could not download file."));
+});
+
 historyBody.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;

@@ -260,6 +260,12 @@ input:focus, select:focus {
   margin-bottom: 0.75rem;
 }
 
+.panel-head-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .hint {
   margin: 0 0 1rem;
   color: var(--text-muted);
