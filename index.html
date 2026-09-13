@@ -90,15 +90,46 @@
                 <th>Customer</th>
                 <th>Phone</th>
                 <th>Sent at</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="historyBody">
-              <tr><td colspan="5" class="empty">No coupons sent yet</td></tr>
+              <tr><td colspan="6" class="empty">No coupons sent yet</td></tr>
             </tbody>
           </table>
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="editModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="editModalBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Edit sent coupon</h2>
+        <button type="button" class="modal-close" id="editModalClose" aria-label="Close">×</button>
+      </div>
+      <form id="editForm" class="modal-body edit-form">
+        <p id="editCouponLabel" class="edit-coupon-label"></p>
+        <label>
+          Customer name
+          <input type="text" id="editCustomerName" required>
+        </label>
+        <label>
+          Phone number
+          <input type="tel" id="editCustomerPhone" required inputmode="numeric">
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="editSendWhatsApp">
+          Send updated coupon on WhatsApp
+        </label>
+        <p id="editError" class="error-msg hidden"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="editCancelBtn">Close</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div id="waModal" class="modal hidden" role="dialog" aria-modal="true">

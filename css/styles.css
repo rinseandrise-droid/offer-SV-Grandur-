@@ -131,6 +131,40 @@ input:focus, select:focus {
 
 .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
 
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(192, 57, 43, 0.35);
+}
+
+.btn-danger:hover {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.edit-form label {
+  margin-bottom: 0.75rem;
+}
+
+.edit-coupon-label {
+  font-weight: 700;
+  margin: 0 0 1rem;
+  color: var(--orange-dark);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .topbar {

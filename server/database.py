@@ -301,6 +301,80 @@ def assign_coupon(code: str, name: str, phone: str) -> dict[str, Any]:
     return result
 
 
+def update_coupon_assignment(code: str, name: str, phone: str) -> dict[str, Any]:
+    normalized = (code or "").strip().upper()
+    name = (name or "").strip()
+    phone = (phone or "").strip()
+    if not normalized:
+        raise ValueError("Coupon code is required.")
+    if not name:
+        raise ValueError("Customer name is required.")
+    if not phone:
+        raise ValueError("Customer phone is required.")
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM coupons WHERE UPPER(code) = ?",
+            (normalized,),
+        ).fetchone()
+        if not row:
+            raise ValueError("Coupon code not found.")
+        row = _row_dict(row)
+        if row["status"] != "used":
+            raise ValueError("Only sent coupons can be edited.")
+
+        conn.execute(
+            """
+            UPDATE coupons
+            SET customer_name = ?, customer_phone = ?
+            WHERE id = ?
+            """,
+            (name, phone, row["id"]),
+        )
+        updated = conn.execute(
+            "SELECT * FROM coupons WHERE id = ?",
+            (row["id"],),
+        ).fetchone()
+        result = _row_dict(updated)
+
+    write_backup()
+    return result
+
+
+def cancel_coupon(code: str) -> dict[str, Any]:
+    normalized = (code or "").strip().upper()
+    if not normalized:
+        raise ValueError("Coupon code is required.")
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM coupons WHERE UPPER(code) = ?",
+            (normalized,),
+        ).fetchone()
+        if not row:
+            raise ValueError("Coupon code not found.")
+        row = _row_dict(row)
+        if row["status"] != "used":
+            raise ValueError("This coupon is not assigned to a customer.")
+
+        conn.execute(
+            """
+            UPDATE coupons
+            SET status = 'available', customer_name = NULL, customer_phone = NULL, sent_at = NULL
+            WHERE id = ?
+            """,
+            (row["id"],),
+        )
+        updated = conn.execute(
+            "SELECT * FROM coupons WHERE id = ?",
+            (row["id"],),
+        ).fetchone()
+        result = _row_dict(updated)
+
+    write_backup()
+    return result
+
+
 def list_history(limit: int = 100) -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(

@@ -126,24 +126,66 @@ function updateCouponPreview() {
   couponPreview.innerHTML = `Selected: <span class="discount-badge">${row.code}</span> — ${row.discount_percent}% discount`;
 }
 
+function escapeHtml(text) {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function renderHistory(rows) {
   if (!rows.length) {
     historyBody.innerHTML =
-      '<tr><td colspan="5" class="empty">No coupons sent yet</td></tr>';
+      '<tr><td colspan="6" class="empty">No coupons sent yet</td></tr>';
     return;
   }
   historyBody.innerHTML = rows
     .map(
       (r) => `
-    <tr>
-      <td><strong>${r.code}</strong></td>
+    <tr data-code="${escapeHtml(r.code)}">
+      <td><strong>${escapeHtml(r.code)}</strong></td>
       <td><span class="discount-badge">${r.discount_percent}%</span></td>
-      <td>${r.customer_name || "—"}</td>
-      <td>${r.customer_phone || "—"}</td>
+      <td>${escapeHtml(r.customer_name || "—")}</td>
+      <td>${escapeHtml(r.customer_phone || "—")}</td>
       <td>${formatDate(r.sent_at)}</td>
+      <td class="actions-cell">
+        <button type="button" class="btn btn-outline btn-sm" data-action="edit" data-code="${escapeHtml(r.code)}">Edit</button>
+        <button type="button" class="btn btn-danger btn-sm" data-action="cancel" data-code="${escapeHtml(r.code)}">Cancel</button>
+      </td>
     </tr>`
     )
     .join("");
+}
+
+let editingCouponCode = null;
+
+function openEditModal(row) {
+  editingCouponCode = row.code;
+  $("#editCouponLabel").textContent = `${row.code} — ${row.discount_percent}% off`;
+  $("#editCustomerName").value = row.customer_name || "";
+  $("#editCustomerPhone").value = row.customer_phone || "";
+  $("#editSendWhatsApp").checked = false;
+  $("#editError").classList.add("hidden");
+  $("#editModal")?.classList.remove("hidden");
+}
+
+function closeEditModal() {
+  editingCouponCode = null;
+  $("#editModal")?.classList.add("hidden");
+}
+
+async function cancelSentCoupon(code) {
+  const label = code.trim().toUpperCase();
+  if (
+    !confirm(
+      `Cancel ${label}? The coupon will become available again for another customer.`
+    )
+  ) {
+    return;
+  }
+  await api(`/api/coupons/${encodeURIComponent(label)}/cancel`, { method: "POST" });
+  await loadDashboard();
 }
 
 let waPollTimer = null;
@@ -416,6 +458,76 @@ sendForm.addEventListener("submit", async (e) => {
 });
 
 $("#refreshBtn").addEventListener("click", () => loadDashboard().catch(console.error));
+
+historyBody.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const code = btn.getAttribute("data-code");
+  if (!code) return;
+
+  if (btn.dataset.action === "edit") {
+    try {
+      const row = await api(`/api/coupons/${encodeURIComponent(code)}`);
+      openEditModal(row);
+    } catch (err) {
+      alert(err.message || "Could not load coupon.");
+    }
+    return;
+  }
+
+  if (btn.dataset.action === "cancel") {
+    btn.disabled = true;
+    try {
+      await cancelSentCoupon(code);
+    } catch (err) {
+      alert(err.message || "Could not cancel coupon.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+});
+
+$("#editForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editingCouponCode) return;
+  const editError = $("#editError");
+  editError.classList.add("hidden");
+  const saveBtn = $("#editForm button[type='submit']");
+  saveBtn.disabled = true;
+
+  try {
+    const result = await api(`/api/coupons/${encodeURIComponent(editingCouponCode)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        customerName: $("#editCustomerName").value.trim(),
+        customerPhone: $("#editCustomerPhone").value.trim(),
+        sendWhatsApp: $("#editSendWhatsApp").checked,
+      }),
+    });
+    closeEditModal();
+    await loadDashboard();
+    if ($("#editSendWhatsApp").checked) {
+      if (result.whatsapp?.sent) {
+        sendSuccess.textContent = `Updated ${result.coupon.code} and sent on WhatsApp.`;
+      } else {
+        sendSuccess.textContent = `Updated ${result.coupon.code}. WhatsApp not sent: ${
+          result.whatsapp?.error || result.whatsapp?.reason || "not connected"
+        }.`;
+      }
+      sendSuccess.classList.remove("hidden");
+      sendError.classList.add("hidden");
+    }
+  } catch (err) {
+    editError.textContent = err.message;
+    editError.classList.remove("hidden");
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+$("#editModalClose")?.addEventListener("click", closeEditModal);
+$("#editModalBackdrop")?.addEventListener("click", closeEditModal);
+$("#editCancelBtn")?.addEventListener("click", closeEditModal);
 
 (async function init() {
   if (getToken()) {

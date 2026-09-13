@@ -13,6 +13,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from db import database_backend_name, database_config_status
 from database import (
     assign_coupon,
+    cancel_coupon,
     export_all,
     get_coupon_by_code,
     get_storage_info,
@@ -20,6 +21,7 @@ from database import (
     init_db,
     list_coupons,
     list_history,
+    update_coupon_assignment,
     write_backup,
 )
 from whatsapp_send import (
@@ -119,6 +121,37 @@ def coupon_detail(code: str):
     if not row:
         return jsonify({"error": "Not found"}), 404
     return jsonify(row)
+
+
+@app.patch("/api/coupons/<code>")
+@require_admin
+def coupon_update(code: str):
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("customerName") or data.get("name") or "").strip()
+    phone = str(data.get("customerPhone") or data.get("phone") or "").strip()
+    send_wa = bool(data.get("sendWhatsApp", False))
+
+    try:
+        coupon = update_coupon_assignment(code, name, phone)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    wa_result = {"sent": False, "skipped": True}
+    if send_wa:
+        wa_result = send_coupon_whatsapp(coupon)
+        wa_result.pop("skipped", None)
+
+    return jsonify({"coupon": coupon, "whatsapp": wa_result})
+
+
+@app.post("/api/coupons/<code>/cancel")
+@require_admin
+def coupon_cancel(code: str):
+    try:
+        coupon = cancel_coupon(code)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "coupon": coupon})
 
 
 @app.get("/api/history")
